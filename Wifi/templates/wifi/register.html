@@ -1,2 +1,21 @@
 <h1>Register</h1>
+
 <p>LINE ID: {{ line_user_id }}</p>
+
+<form method="POST">
+    {% csrf_token %}
+
+    <input type="hidden" name="line_user_id" value="{{ line_user_id }}">
+
+    <p>
+        <label>ชื่อ</label><br>
+        <input type="text" name="first_name" required>
+    </p>
+
+    <p>
+        <label>เบอร์โทร</label><br>
+        <input type="text" name="phone" required>
+    </p>
+
+    <button type="submit">สมัคร</button>
+</form>
