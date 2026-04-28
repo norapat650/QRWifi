@@ -2,9 +2,39 @@
 <html>
 <head>
     <title>QRWifi</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
 <body>
-    <h1>QRWifi Landing</h1>
-    <p>กำลังเข้าสู่ระบบ...</p>
+    <h2>QRWifi Login</h2>
+    <p id="status">กำลังตรวจสอบ LINE...</p>
+
+    <script>
+        const LIFF_ID = "ใส่_LIFF_ID_ตรงนี้";
+
+        async function main() {
+            await liff.init({ liffId: LIFF_ID });
+
+            if (!liff.isLoggedIn()) {
+                liff.login();
+                return;
+            }
+
+            const profile = await liff.getProfile();
+            const lineUserId = profile.userId;
+
+            document.getElementById("status").innerText = "กำลังตรวจสอบข้อมูล...";
+
+            const response = await fetch(`/check-user/?lineUserId=${lineUserId}`);
+            const data = await response.json();
+
+            if (data.success) {
+                window.location.href = data.redirect_url;
+            } else {
+                document.getElementById("status").innerText = "เกิดข้อผิดพลาด";
+            }
+        }
+
+        main();
+    </script>
 </body>
 </html>

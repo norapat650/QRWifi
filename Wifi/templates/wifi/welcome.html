@@ -1,2 +1,8 @@
-<h1>Welcome back</h1>
-<p>คุณเคยลงทะเบียนแล้ว</p>
+<h1>Welcome Back</h1>
+<p>กำลังเชื่อมต่อ WiFi...</p>
+
+<script>
+    setTimeout(function(){
+        window.location.href = "/promo/?lineUserId={{ line_user_id }}&campaign=wifi";
+    }, 1000);
+</script>

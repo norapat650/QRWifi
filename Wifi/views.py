@@ -21,28 +21,19 @@ def create_access_log(request, line_user_id, action):
 
 
 def landing_page(request):
-    create_access_log(request, "unknown", "visit_landing")
     return render(request, "wifi/landing.html")
 
 
 def check_user(request):
     line_user_id = request.GET.get("lineUserId")
 
-    if not line_user_id:
-        create_access_log(request, "unknown", "missing_line_user_id")
-        return JsonResponse({
-            "success": False,
-            "message": "Missing lineUserId"
-        })
-
     user = WifiUser.objects.filter(line_user_id=line_user_id).first()
-    create_access_log(request, line_user_id, "check_user")
 
     if user:
         return JsonResponse({
             "success": True,
             "is_registered": True,
-            "redirect_url": "/welcome/"
+            "redirect_url": f"/welcome/?lineUserId={line_user_id}"
         })
 
     return JsonResponse({
@@ -54,39 +45,24 @@ def check_user(request):
 
 def register_page(request):
     if request.method == "POST":
-        line_user_id = (request.POST.get("line_user_id") or "").strip()
-        first_name = (request.POST.get("first_name") or "").strip()
-        phone = (request.POST.get("phone") or "").strip()
-
-        if not line_user_id or not first_name or not phone:
-            create_access_log(request, line_user_id, "register_failed")
-            return render(request, "wifi/register.html", {
-                "line_user_id": line_user_id,
-                "error": "กรุณากรอกข้อมูลให้ครบ"
-            })
+        line_user_id = request.POST.get("line_user_id")
+        first_name = request.POST.get("first_name")
+        phone = request.POST.get("phone")
 
         try:
-            user, created = WifiUser.objects.get_or_create(
+            WifiUser.objects.get_or_create(
                 line_user_id=line_user_id,
                 defaults={
                     "first_name": first_name,
-                    "phone": phone,
+                    "phone": phone
                 }
             )
         except IntegrityError:
-            user = WifiUser.objects.get(line_user_id=line_user_id)
-            created = False
+            pass
 
-        create_access_log(
-            request,
-            line_user_id,
-            "register_success" if created else "register_existing"
-        )
-
-        return redirect("https://google.com")
+        return redirect(f"/promo/?lineUserId={line_user_id}&campaign=wifi")
 
     line_user_id = request.GET.get("lineUserId")
-    create_access_log(request, line_user_id, "view_register")
 
     return render(request, "wifi/register.html", {
         "line_user_id": line_user_id
@@ -94,5 +70,17 @@ def register_page(request):
 
 
 def welcome_page(request):
-    create_access_log(request, "unknown", "view_welcome")
-    return redirect("https://google.com")
+    line_user_id = request.GET.get("lineUserId")
+    return render(request, "wifi/welcome.html", {
+        "line_user_id": line_user_id
+    })
+
+
+def promo_page(request):
+    line_user_id = request.GET.get("lineUserId")
+    campaign = request.GET.get("campaign", "wifi")
+
+    return render(request, "wifi/promo.html", {
+        "line_user_id": line_user_id,
+        "campaign": campaign
+    })
