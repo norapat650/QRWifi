@@ -2,39 +2,59 @@
 <html>
 <head>
     <title>QRWifi</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
 <body>
     <h2>QRWifi Login</h2>
-    <p id="status">กำลังตรวจสอบ LINE...</p>
+    <p id="status">หน้าใหม่โหลดแล้ว...</p>
 
     <script>
-        const LIFF_ID = "ใส่_LIFF_ID_ตรงนี้";
+        const LIFF_ID = "2009925736-skZwklvN";
+
+        function setStatus(text) {
+            document.getElementById("status").innerText = text;
+        }
 
         async function main() {
-            await liff.init({ liffId: LIFF_ID });
+            try {
+                setStatus("JavaScript เริ่มทำงานแล้ว");
 
-            if (!liff.isLoggedIn()) {
-                liff.login();
-                return;
-            }
+                if (typeof liff === "undefined") {
+                    setStatus("โหลด LIFF SDK ไม่สำเร็จ");
+                    return;
+                }
 
-            const profile = await liff.getProfile();
-            const lineUserId = profile.userId;
+                setStatus("กำลังเชื่อมต่อ LINE...");
+                await liff.init({ liffId: LIFF_ID });
 
-            document.getElementById("status").innerText = "กำลังตรวจสอบข้อมูล...";
+                if (!liff.isLoggedIn()) {
+                    setStatus("กำลัง login LINE...");
+                    liff.login();
+                    return;
+                }
 
-            const response = await fetch(`/check-user/?lineUserId=${lineUserId}`);
-            const data = await response.json();
+                setStatus("ดึงข้อมูล LINE...");
+                const profile = await liff.getProfile();
+                const lineUserId = profile.userId;
 
-            if (data.success) {
-                window.location.href = data.redirect_url;
-            } else {
-                document.getElementById("status").innerText = "เกิดข้อผิดพลาด";
+                setStatus("กำลังตรวจสอบข้อมูล...");
+                const response = await fetch(`/check-user/?lineUserId=${encodeURIComponent(lineUserId)}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    window.location.href = data.redirect_url;
+                } else {
+                    setStatus("เกิดข้อผิดพลาดจาก server");
+                }
+
+            } catch (error) {
+                console.error(error);
+                setStatus("LIFF error: " + error.message);
             }
         }
 
-        main();
+        window.addEventListener("load", main);
     </script>
 </body>
 </html>

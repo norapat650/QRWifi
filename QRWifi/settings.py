@@ -25,8 +25,6 @@ SECRET_KEY = 'django-insecure-d^#@t0lgn!7@+2ad=*@kt0g1-8!toklv@g$9a9z3iay+db+^%^
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-
 
 # Application definition
 
@@ -52,7 +50,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'QRWifi.urls'
-
+ALLOWED_HOSTS = ["*"]
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -104,7 +102,10 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+ALLOWED_HOSTS = ["*"]
+CSRF_TRUSTED_ORIGINS = [
+    "https://retorted-negative-bartender.ngrok-free.dev",
+]
 
 TIME_ZONE = 'UTC'
 
