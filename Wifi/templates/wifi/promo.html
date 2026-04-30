@@ -4,6 +4,22 @@
 
 <h3>Welcome Back / Customer Portal</h3>
 
-<a href="https://google.com">
-    <button style="font-size:20px;padding:10px;">Connect WiFi</button>
-</a>
+
+<button onclick="connectWifi()" style="font-size:20px;padding:10px;">Connect WiFi</button>
+
+<script>
+  async function connectWifi() {
+      const lineUserId = "{{ line_user_id }}";
+
+      try {
+          // send log to backend
+          await fetch(`/log-connect/?lineUserId=${encodeURIComponent(lineUserId)}`);
+      } catch (e) {
+          console.error('log-connect failed', e);
+      }
+
+      alert("WiFi Connected (Demo Mode)");
+      // future: redirect to router login URL
+      // window.location.href = "http://192.168.1.1/login";
+  }
+</script>
