@@ -9,11 +9,59 @@
     <h2>QRWifi Login</h2>
     <p id="status">หน้าใหม่โหลดแล้ว...</p>
 
+    
     <script>
         const LIFF_ID = "2009925736-skZwklvN";
+        const MIKROTIK_LOGIN_URL = "http://192.168.30.1/login";
+        const WIFI_USERNAME = "freewifi";
+        const WIFI_PASSWORD = "welcome";
 
         function setStatus(text) {
             document.getElementById("status").innerText = text;
+        }
+
+        function submitMikrotikLoginBackToCurrentPage() {
+            setStatus("กำลังเชื่อมต่อ WiFi...");
+
+            const form = document.createElement("form");
+            form.method = "POST";
+            form.action = MIKROTIK_LOGIN_URL;
+
+            const fields = {
+                username: WIFI_USERNAME,
+                password: WIFI_PASSWORD,
+                dst: window.location.href,
+            };
+
+            Object.keys(fields).forEach((key) => {
+                const input = document.createElement("input");
+                input.type = "hidden";
+                input.name = key;
+                input.value = fields[key];
+                form.appendChild(input);
+            });
+
+            document.body.appendChild(form);
+            form.submit();
+        }
+
+        async function safeFetchJson(url) {
+            const response = await fetch(url, {
+                headers: {
+                    "Accept": "application/json"
+                }
+            });
+
+            const contentType = response.headers.get("content-type") || "";
+
+            if (!contentType.includes("application/json")) {
+                return {
+                    success: false,
+                    hotspot_blocked: true
+                };
+            }
+
+            return await response.json();
         }
 
         async function main() {
@@ -29,28 +77,36 @@
                 await liff.init({ liffId: LIFF_ID });
 
                 if (!liff.isLoggedIn()) {
-                    setStatus("กำลัง login LINE...");
+                    setStatus("กำลังเข้าสู่ระบบ LINE...");
                     liff.login();
                     return;
                 }
 
-                setStatus("ดึงข้อมูล LINE...");
+                setStatus("กำลังดึงข้อมูล LINE...");
                 const profile = await liff.getProfile();
                 const lineUserId = profile.userId;
 
                 setStatus("กำลังตรวจสอบข้อมูล...");
-                const response = await fetch(`/check-user/?lineUserId=${encodeURIComponent(lineUserId)}`);
-                const data = await response.json();
+                const data = await safeFetchJson(
+                    `/check-user/?lineUserId=${encodeURIComponent(lineUserId)}`
+                );
+
+                if (data.hotspot_blocked) {
+                    submitMikrotikLoginBackToCurrentPage();
+                    return;
+                }
 
                 if (data.success) {
                     window.location.href = data.redirect_url;
-                } else {
-                    setStatus("เกิดข้อผิดพลาดจาก server");
+                    return;
                 }
+
+                setStatus("ตรวจสอบข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
 
             } catch (error) {
                 console.error(error);
-                setStatus("LIFF error: " + error.message);
+                setStatus("ระบบกำลังพยายามเชื่อมต่อ WiFi อีกครั้ง...");
+                submitMikrotikLoginBackToCurrentPage();
             }
         }
 

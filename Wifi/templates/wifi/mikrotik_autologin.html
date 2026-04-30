@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Connecting WiFi</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+    <h3>กำลังเชื่อมต่อ WiFi...</h3>
+
+    <form id="loginForm" method="POST" action="{{ mikrotik_login_url }}">
+        <input type="hidden" name="username" value="{{ username }}">
+        <input type="hidden" name="password" value="{{ password }}">
+        <input type="hidden" name="dst" value="{{ dst }}">
+    </form>
+
+    <script>
+        document.getElementById("loginForm").submit();
+    </script>
+</body>
+</html>
