@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QRWifi Login</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="logo2.png">
+
+    <!-- Graphic: Bootstrap & Fonts -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;500&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            /* เปลี่ยนพื้นหลังข้างนอกเป็นสีขาว */
+            background-color: #ffffff;
+            font-family: 'Kanit', sans-serif;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* หน้ากาก Loading Screen */
+        .loading-container {
+            background-color: white;
+            width: 90%;
+            max-width: 380px;
+            padding: 40px 20px;
+            border-radius: 15px;
+            /* ขอบสีแดงและเงาจางๆ ตามสไตล์ใหม่ */
+            border: 2px solid #ee1c25;
+            box-shadow: 0 10px 30px rgba(238, 28, 37, 0.15);
+            text-align: center;
+        }
+
+        .loader-logo {
+            width: 70px;
+            margin-bottom: 25px;
+            animation: pulse 2s infinite ease-in-out;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.1);
+                opacity: 0.7;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        #status {
+            color: #888;
+            font-size: 0.9rem;
+            margin-top: 20px;
+            font-weight: 300;
+        }
+
+        .spinner-border {
+            width: 2.5rem;
+            height: 2.5rem;
+            color: #fbce07 !important;
+            /* สีเหลือง Shell */
+        }
+    </style>
+
+    <!-- โหลด LIFF SDK เดิม -->
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+</head>
+
+<body>
+
+    <div class="loading-container">
+        <!-- โลโก้ Shell -->
+        <img src="logo1.png" alt="Shell" class="loader-logo">
+
+        <!-- ตัวหมุนโหลด -->
+        <div>
+            <div class="spinner-border" role="status"></div>
+        </div>
+
+        <h2 class="h4 mt-4 fw-bold text-dark">กำลังตรวจสอบสิทธิ์</h2>
+        <p id="status">กรุณารอสักครู่...</p>
+    </div>
+
+    <script>
+        // --- CONSTANTS เดิมของคุณ --- 2009925736-skZwklvN
+        const LIFF_ID = "2009938013-DoUCreWN";
+        const MIKROTIK_LOGIN_URL = "http://192.168.30.1/login";
+        const WIFI_USERNAME = "freewifi";
+        const WIFI_PASSWORD = "welcome";
+
+        // --- Logic เดิมทั้งหมด ไม่มีการแก้ไข ---
+        function setStatus(text) {
+            document.getElementById("status").innerText = text;
+        }
+
+        function submitMikrotikLoginBackToCurrentPage() {
+            setStatus("กำลังเชื่อมต่อ WiFi...");
+            const form = document.createElement("form");
+            form.method = "POST";
+            form.action = MIKROTIK_LOGIN_URL;
+            const fields = {
+                username: WIFI_USERNAME,
+                password: WIFI_PASSWORD,
+                dst: window.location.href,
+            };
+            Object.keys(fields).forEach((key) => {
+                const input = document.createElement("input");
+                input.type = "hidden";
+                input.name = key;
+                input.value = fields[key];
+                form.appendChild(input);
+            });
+            document.body.appendChild(form);
+            form.submit();
+        }
+
+        async function safeFetchJson(url) {
+            const response = await fetch(url, { headers: { "Accept": "application/json" } });
+            const contentType = response.headers.get("content-type") || "";
+            if (!contentType.includes("application/json")) {
+                return { success: false, hotspot_blocked: true };
+            }
+            return await response.json();
+        }
+
+        async function main() {
+            try {
+                if (typeof liff === "undefined") {
+                    setStatus("โหลดระบบไม่สำเร็จ");
+                    return;
+                }
+                await liff.init({ liffId: LIFF_ID });
+                if (!liff.isLoggedIn()) {
+                    liff.login();
+                    return;
+                }
+                const profile = await liff.getProfile();
+                const lineUserId = profile.userId;
+                const data = await safeFetchJson(`/check-user/?lineUserId=${encodeURIComponent(lineUserId)}`);
+
+                if (data.hotspot_blocked) {
+                    submitMikrotikLoginBackToCurrentPage();
+                    return;
+                }
+                if (data.success) {
+                    window.location.href = data.redirect_url;
+                    return;
+                }
+                setStatus("ไม่สามารถยืนยันตัวตนได้");
+            } catch (error) {
+                submitMikrotikLoginBackToCurrentPage();
+            }
+        }
+        window.addEventListener("load", main);
+    </script>
+</body>
+
+</html>
