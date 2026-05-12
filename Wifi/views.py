@@ -3,11 +3,58 @@ from django.http import JsonResponse
 from django.db import IntegrityError
 from .models import WifiUser, WifiAccessLog
 import requests
-
+import binascii
+from django.shortcuts import render
+from librouteros import connect
+import logging
 
 COMMUNE_PORTAL_URL = "https://commune.shellutapao.com"
 COMMUNE_API_URL = "https://commune.shellutapao.com/api/customer-sync"
+logger = logging.getLogger(__name__)
 
+def liff_login_page(request):
+    """หน้าแรกที่ลูกค้าสแกน QR เข้ามา (แสดงหน้าจอ LINE LIFF)"""
+    return render(request, 'liff_index.html')
+
+def activate_wifi(request):
+    """ฟังก์ชันที่จะถูกเรียกเมื่อลูกค้ากดปุ่ม 'ตกลง' ใน LINE"""
+    if request.method == "POST":
+        # 1. รับค่าจาก LINE LIFF (ส่งมาทาง AJAX หรือ Form)
+        line_id = request.POST.get('line_id')
+        
+        # 2. ดึง IP Address ของลูกค้า (สำคัญมาก เพราะ MikroTik ใช้ IP ในการเปิดเน็ต)
+        # ถ้าใช้ ngrok ต้องระวังเรื่อง X-Forwarded-For
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            client_ip = x_forwarded_for.split(',')[0]
+        else:
+            client_ip = request.META.get('REMOTE_ADDR')
+
+        try:
+            # 3. เชื่อมต่อ MikroTik API (ใส่ข้อมูลที่ได้จากเพื่อน)
+            api = connect(
+                host='IP_ROUTER_FRIEND', # IP/Domain ที่เพื่อนให้มา
+                username='django_api',   # User ที่เพื่อนสร้างไว้
+                password='PASSWORD_HERE', # Pass ที่เพื่อนสร้างไว้
+                port=8728
+            )
+            
+            # 4. สั่ง Bypass Login ใน MikroTik
+            # Path: /ip/hotspot/active/add
+            hotspot_active = api.path('ip', 'hotspot', 'active')
+            hotspot_active.add(
+                user='shell_guest', # ชื่อ user กลางใน MikroTik
+                address=client_ip,  # IP ของมือถือลูกค้า
+                comment=f"LINE_{line_id}" # เก็บไว้ดูใน MikroTik ว่าใครใช้
+            )
+            
+            return JsonResponse({'status': 'success', 'message': 'Internet Activated!'})
+
+        except Exception as e:
+            logger.error(f"MikroTik Error: {e}")
+            return JsonResponse({'status': 'error', 'message': str(e)})
+
+    return JsonResponse({'status': 'failed', 'message': 'Invalid Request'})
 
 def get_client_ip(request):
     x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
@@ -15,6 +62,10 @@ def get_client_ip(request):
         return x_forwarded_for.split(",")[0]
     return request.META.get("REMOTE_ADDR")
 
+def submit_to_mikrotik(request):
+    user_ip = request.META.get('REMOTE_ADDR')
+    line_id = request.POST.get('line_id')
+    return render(request, 'success.html')
 
 def create_access_log(request, line_user_id, action):
     WifiAccessLog.objects.create(
@@ -24,6 +75,43 @@ def create_access_log(request, line_user_id, action):
         user_agent=request.META.get("HTTP_USER_AGENT", "")
     )
 
+def bypass_mikrotik_login(client_ip):
+    try:
+        api = connect(
+            host='Router_IP_ของคุณ', 
+            username='django_api', 
+            password='YOUR_PASSWORD',
+            port=8728
+        )
+        api.path('ip', 'hotspot', 'active').add(
+            user='shell_guest', 
+            address=client_ip
+        )
+        
+        return True
+    except Exception as e:
+        print(f"Error: {e}")
+        return False
+
+def login_to_mikrotik(request):
+    client_ip = request.META.get('REMOTE_ADDR')
+    
+    try:
+        api = connect(
+            host='IP_ของ_Router', 
+            username='django_api', 
+            password='PASSWORD_ที่คุณตั้งไว้'
+        )
+        params = {
+            'user': 'shell_guest', 
+            'address': client_ip,
+        }
+        api.path('ip', 'hotspot', 'active').add(**params)
+        
+        return render(request, 'success.html', {'message': 'เชื่อมต่อสำเร็จ!'})
+        
+    except Exception as e:
+        return render(request, 'error.html', {'error': str(e)})
 
 def sync_to_commune(user):
     """
@@ -198,3 +286,53 @@ def wifi_demo(request):
         "success": True,
         "message": f"WiFi Ready for {line_user_id}"
     })
+
+def activate_wifi_user(request):
+    client_ip = request.META.get('REMOTE_ADDR')
+    
+    try:
+        api = connect(
+            host='IP_ที่เพื่อนให้มา', 
+            username='USER_ที่เพื่อนให้มา', 
+            password='PASS_ที่เพื่อนให้มา',
+            port=8728
+        )
+        api.path('ip', 'hotspot', 'active').add(
+            user='shell_guest', 
+            address=client_ip
+        )
+        return render(request, 'success.html')
+    except Exception as e:
+        print(f"เชื่อมต่อ MikroTik ไม่ได้: {e}")
+        return render(request, 'error.html')
+
+def promo_page(request):
+    line_user_id = request.GET.get("lineUserId")
+    campaign = request.GET.get("campaign", "wifi")
+
+    create_access_log(request, line_user_id, f"view_promo_{campaign}")
+
+    # --- ส่วนที่ต้องแก้: สั่ง MikroTik ผ่าน API ตรงนี้เลย ---
+    client_ip = get_client_ip(request) # ใช้ฟังก์ชันที่คุณเขียนไว้แล้ว
+    
+    try:
+        api = connect(
+            host='IP_ที่เพื่อนให้มา', 
+            username='django_api', 
+            password='PASSWORD_HERE',
+            port=8728,
+            timeout=5 # กันค้าง
+        )
+        api.path('ip', 'hotspot', 'active').add(
+            user='shell_guest', 
+            address=client_ip,
+            comment=f"LINE_{line_user_id}"
+        )
+        # ถ้าสำเร็จ ส่งไปหน้าสำเร็จของ Commune หรือหน้า Success ของเรา
+        return render(request, 'success.html', {'line_id': line_user_id})
+
+    except Exception as e:
+        logger.error(f"MikroTik Connection Failed: {e}")
+        # ถ้า API ล่ม ให้ส่งไปหน้า Login ปกติเป็นแผนสำรอง (Fallback)
+        mikrotik_login_url = "http://192.168.30.1/login"
+        return redirect(mikrotik_login_url)
