@@ -7,6 +7,7 @@ import binascii
 from django.shortcuts import render
 from librouteros import connect
 import logging
+from django.urls import path
 
 COMMUNE_PORTAL_URL = "https://commune.shellutapao.com"
 COMMUNE_API_URL = "https://commune.shellutapao.com/api/customer-sync"
