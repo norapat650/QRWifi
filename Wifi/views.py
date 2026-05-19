@@ -4,10 +4,11 @@ from django.db import IntegrityError
 from .models import WifiUser, WifiAccessLog
 import requests
 import binascii
-from django.shortcuts import render
-from librouteros import connect
 import logging
 from django.urls import path
+
+# ปิด librouteros ไว้ชั่วคราวเนื่องจากไม่มีอุปกรณ์จริงในระบบทดสอบ
+# from librouteros import connect
 
 COMMUNE_PORTAL_URL = "https://commune.shellutapao.com"
 COMMUNE_API_URL = "https://commune.shellutapao.com/api/customer-sync"
@@ -37,42 +38,15 @@ def create_access_log(request, line_user_id, action):
     )
 
 def bypass_mikrotik_login(client_ip):
-    try:
-        api = connect(
-            host='Router_IP_ของคุณ', 
-            username='django_api', 
-            password='YOUR_PASSWORD',
-            port=8728
-        )
-        api.path('ip', 'hotspot', 'active').add(
-            user='shell_guest', 
-            address=client_ip
-        )
-        
-        return True
-    except Exception as e:
-        print(f"Error: {e}")
-        return False
+    """จำลองการล็อกอินสำเร็จโดยไม่ต้องเชื่อมต่อ Router จริง"""
+    logger.info(f"[Bypass] Simulated MikroTik active activation for IP: {client_ip}")
+    return True
 
 def login_to_mikrotik(request):
+    """จำลองระบบล็อกอินเข้าสู่ MikroTik"""
     client_ip = request.META.get('REMOTE_ADDR')
-    
-    try:
-        api = connect(
-            host='IP_ของ_Router', 
-            username='django_api', 
-            password='PASSWORD_ที่คุณตั้งไว้'
-        )
-        params = {
-            'user': 'shell_guest', 
-            'address': client_ip,
-        }
-        api.path('ip', 'hotspot', 'active').add(**params)
-        
-        return render(request, 'success.html', {'message': 'เชื่อมต่อสำเร็จ!'})
-        
-    except Exception as e:
-        return render(request, 'error.html', {'error': str(e)})
+    logger.info(f"[Bypass] Simulated connection to MikroTik from IP: {client_ip}")
+    return render(request, 'success.html', {'message': 'เชื่อมต่อสำเร็จ! (ระบบจำลองการทำงาน)'})
 
 def sync_to_commune(user):
     """
@@ -87,32 +61,23 @@ def sync_to_commune(user):
             "email": user.email,
             "source": "qrwifi",
         }
-
         response = requests.post(COMMUNE_API_URL, json=payload, timeout=3)
         print("Commune sync response:", response.status_code, response.text)
-
     except Exception as e:
         print("Commune sync error:", e)
 
-
 def allow_mikrotik_wifi(request, line_user_id):
-    """
-    เก็บไว้สำหรับ Phase ถัดไป: MikroTik API / IP Binding
-    ตอนนี้ยังไม่ใช้ POST /login เพราะ MikroTik Hotspot ต้องผูก session กับ client browser
-    """
-    create_access_log(request, line_user_id, "mikrotik_allow_pending")
+    """จำลองการอนุมัติสิทธิ์การเข้าใช้เน็ตใน Log"""
+    create_access_log(request, line_user_id, "mikrotik_allow_simulated")
     return True
-
 
 def get_promo_redirect_url(line_user_id):
     safe_line_user_id = line_user_id or "unknown"
     return f"/promo/?lineUserId={safe_line_user_id}&campaign=wifi"
 
-
 def landing_page(request):
     create_access_log(request, "unknown", "visit_landing")
     return render(request, "wifi/landing.html")
-
 
 def check_user(request):
     line_user_id = request.GET.get("lineUserId")
@@ -136,14 +101,12 @@ def check_user(request):
             "redirect_url": f"/promo/?lineUserId={line_user_id}"
         })
 
-    # ถ้าไม่มี user หรือมี line_user_id แล้วแต่ข้อมูลยังไม่ครบ ให้กลับไปกรอกฟอร์มสมัคร Commune ก่อน
     create_access_log(request, line_user_id, "needs_register_info")
     return JsonResponse({
         "success": True,
         "is_registered": False,
         "redirect_url": f"/register/?lineUserId={line_user_id}"
     })
-
 
 def register_page(request):
     if request.method == "POST":
@@ -185,12 +148,10 @@ def register_page(request):
         )
 
         sync_to_commune(user)
-
         return redirect(get_promo_redirect_url(line_user_id))
 
     line_user_id = request.GET.get("lineUserId")
     create_access_log(request, line_user_id, "view_register")
-
     existing_user = WifiUser.objects.filter(line_user_id=line_user_id).first()
 
     return render(request, "wifi/register.html", {
@@ -198,35 +159,23 @@ def register_page(request):
         "existing_user": existing_user,
     })
 
-
 def welcome_page(request):
     line_user_id = request.GET.get("lineUserId") or "unknown"
     create_access_log(request, line_user_id, "view_welcome")
     return redirect(get_promo_redirect_url(line_user_id))
 
-
 def promo_page(request):
+    """
+    หน้าแสดงโปรโมชั่นหลัก: ทำการ Bypass คำสั่ง API ของ MikroTik เพื่อให้ระบบทำงานต่อได้ทันที
+    """
     line_user_id = request.GET.get("lineUserId")
     campaign = request.GET.get("campaign", "wifi")
 
     create_access_log(request, line_user_id, f"view_promo_{campaign}")
-
-    # เก็บไว้เผื่อ Phase ถัดไป: allow ผ่าน MikroTik API / IP Binding
     allow_mikrotik_wifi(request, line_user_id)
+    create_access_log(request, line_user_id, "render_welcome_page_bypass")
 
-    # วิธีปัจจุบัน: ให้ client browser เข้า MikroTik login เอง เพื่อผูก session/cookie กับมือถือเครื่องนั้น
-    # ถ้า login สำเร็จ MikroTik จะปล่อย internet ตาม policy เดิม แล้ว user จะเห็น/ไปต่อได้จาก hotspot flow
-    mikrotik_login_url = "http://192.168.30.1/login"
-
-    create_access_log(request, line_user_id, "render_mikrotik_autologin")
-
-    return redirect(
-    f"{COMMUNE_PORTAL_URL}"
-    f"?lineUserId={line_user_id}"
-    f"&source=qrwifi"
-    f"&campaign={campaign}"
-)
-
+    return render(request, "wifi/welcome.html", {"line_user_id": line_user_id})
 
 def log_connect(request):
     line_user_id = request.GET.get("lineUserId")
@@ -235,8 +184,8 @@ def log_connect(request):
 
     return JsonResponse({
         "success": True,
-        "message": "connect logged",
-        "mikrotik": "redirect_login_mode"
+        "message": "connect logged (Simulated)",
+        "mikrotik": "bypass_mode"
     })
 
 def wifi_demo(request):
@@ -245,63 +194,14 @@ def wifi_demo(request):
 
     return JsonResponse({
         "success": True,
-        "message": f"WiFi Ready for {line_user_id}"
+        "message": f"WiFi Ready for {line_user_id} (Demo Mode)"
     })
 
 def activate_wifi(request):
+    """ฟังก์ชันรองรับสิทธิ์การเปิดเน็ตผ่าน API (Bypass สำหรับเวอร์ชันทดสอบ)"""
     if request.method == "POST":
         line_id = request.POST.get('line_id')
-        
         client_ip = get_client_ip(request) 
-
-        try:
-            api = connect(
-                host='IP_ที่เพื่อนให้มา', 
-                username='django_api', 
-                password='PASSWORD_HERE', 
-                port=8728,
-                timeout=10 
-            )
-            
-            api.path('ip', 'hotspot', 'active').add(
-                user='shell_guest', 
-                address=client_ip,
-                comment=f"LINE:{line_id}"
-            )
-            
-            return JsonResponse({'status': 'success', 'message': 'ยินดีด้วย! เล่นเน็ตได้แล้ว'})
-
-        except Exception as e:
-            logger.error(f"MikroTik Error: {e}")
-            return JsonResponse({'status': 'error', 'message': 'เกิดข้อผิดพลาดในการเชื่อมต่อ Router'})
-
-def promo_page(request):
-    line_user_id = request.GET.get("lineUserId")
-    campaign = request.GET.get("campaign", "wifi")
-
-    create_access_log(request, line_user_id, f"view_promo_{campaign}")
-
-    # --- ส่วนที่ต้องแก้: สั่ง MikroTik ผ่าน API ตรงนี้เลย ---
-    client_ip = get_client_ip(request) # ใช้ฟังก์ชันที่คุณเขียนไว้แล้ว
-    
-    try:
-        api = connect(
-            host='IP_ที่เพื่อนให้มา', 
-            username='django_api', 
-            password='PASSWORD_HERE',
-            port=8728,
-            timeout=5 # กันค้าง
-        )
-        api.path('ip', 'hotspot', 'active').add(
-            user='shell_guest', 
-            address=client_ip,
-            comment=f"LINE_{line_user_id}"
-        )
-        # ถ้าสำเร็จ ส่งไปหน้าสำเร็จของ Commune หรือหน้า Success ของเรา
-        return render(request, 'success.html', {'line_id': line_user_id})
-
-    except Exception as e:
-        logger.error(f"MikroTik Connection Failed: {e}")
-        # ถ้า API ล่ม ให้ส่งไปหน้า Login ปกติเป็นแผนสำรอง (Fallback)
-        mikrotik_login_url = "http://192.168.30.1/login"
-        return redirect(mikrotik_login_url)
+        
+        logger.info(f"[Bypass API] Approved access for line_id: {line_id} at IP: {client_ip}")
+        return JsonResponse({'status': 'success', 'message': 'ยินดีด้วย! เล่นเน็ตได้แล้ว (ระบบจำลองการทำงาน)'})
