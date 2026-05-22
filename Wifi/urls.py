@@ -8,7 +8,7 @@ urlpatterns = [
     path("register/", views.register_page, name="register_page"),
     path("welcome/", views.welcome_page, name="welcome_page"),
     path("promo/", views.promo_page, name="promo_page"),
-    path("log-connect/", views.log_connect, name="log_connect"),
+    path("log_connect/", views.log_connect, name="log_connect"),
     path("wifi-demo/", views.wifi_demo),
     path('activate/', views.activate_wifi, name='activate_wifi'), # มาอยู่ตรงนี้ถูกที่แล้ว!
 ]

@@ -5,6 +5,7 @@ from .models import WifiUser, WifiAccessLog
 import requests
 import binascii
 import logging
+import librouteros
 from django.urls import path
 
 # ปิด librouteros ไว้ชั่วคราวเนื่องจากไม่มีอุปกรณ์จริงในระบบทดสอบ
@@ -185,7 +186,8 @@ def log_connect(request):
     return JsonResponse({
         "success": True,
         "message": "connect logged (Simulated)",
-        "mikrotik": "bypass_mode"
+        "mikrotik": "bypass_mode",
+        "redirect_url": "https://www.google.com",
     })
 
 def wifi_demo(request):
@@ -198,10 +200,20 @@ def wifi_demo(request):
     })
 
 def activate_wifi(request):
-    """ฟังก์ชันรองรับสิทธิ์การเปิดเน็ตผ่าน API (Bypass สำหรับเวอร์ชันทดสอบ)"""
-    if request.method == "POST":
-        line_id = request.POST.get('line_id')
-        client_ip = get_client_ip(request) 
+    # ข้อมูลสำหรับเชื่อมต่อ Router ของคุณ
+    router_ip = '192.168.30.1' 
+    username = 'admin'
+    password = 'your_password' # ใส่รหัสผ่าน Router ของคุณ
+    
+    client_ip = request.META.get('REMOTE_ADDR')
+    
+    try:
+        # เชื่อมต่อกับ MikroTik
+        api = librouteros.connect(router_ip, username, password)
         
-        logger.info(f"[Bypass API] Approved access for line_id: {line_id} at IP: {client_ip}")
-        return JsonResponse({'status': 'success', 'message': 'ยินดีด้วย! เล่นเน็ตได้แล้ว (ระบบจำลองการทำงาน)'})
+        # คำสั่งสร้าง Hotspot IP Binding เพื่ออนุญาตให้เข้าเน็ตได้โดยไม่ต้อง Login ซ้ำ
+        api(cmd='/ip/hotspot/ip-binding/add', address=client_ip, type='bypassed')
+        
+        return JsonResponse({'status': 'success', 'message': 'คุณสามารถใช้งาน Internet ได้แล้ว'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)})
