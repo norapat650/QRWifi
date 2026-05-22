@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="th">
 
@@ -7,15 +8,15 @@
     <title>Welcome Back - Shell Free Wi-Fi</title>
 
     <link rel="icon" type="image/png" href="logo2.png">
-
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;500&display=swap" rel="stylesheet">
 
     <style>
-        body { 
-            background-color: #ffffff; 
-            font-family: 'Kanit', sans-serif; 
+        body {
+            background-color: #ffffff;
+            font-family: 'Kanit', sans-serif;
         }
+
         .welcome-card {
             border-radius: 15px;
             border: 2px solid #ee1c25;
@@ -23,6 +24,7 @@
             background-color: #fff;
             padding: 40px 20px;
         }
+
         .check-icon {
             background-color: #28a745;
             color: white;
@@ -34,6 +36,7 @@
             margin: 0 auto 20px auto;
             box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
         }
+
         .btn-go-home {
             background-color: #fbce07;
             color: #333;
@@ -46,6 +49,7 @@
             transition: all 0.3s ease;
             width: 100%;
         }
+
         .btn-go-home:hover {
             background-color: #e5bc06;
             box-shadow: 0 6px 20px rgba(251, 206, 7, 0.6);
@@ -61,7 +65,7 @@
             <div class="col-11 col-sm-8 col-md-6 col-lg-4">
                 <div class="card welcome-card">
                     <div class="mb-4">
-                        <img src="logo1.png" width="80" alt="Shell">
+                        <img src="{% static 'logo1.png' %}" width="80" alt="Shell">
                     </div>
                     <h1 class="fw-bold mb-3 text-dark">Welcome back</h1>
                     <div class="check-icon">✓</div>
@@ -78,9 +82,14 @@
 
     <script>
         function handleConnect(lineUserId) {
-            // เรียกไปยัง Path ที่ตรงกับ urls.py (log-connect)
-            fetch('/log-connect/?lineUserId=' + lineUserId)
-                .then(response => response.json())
+            // ใช้ /log_connect/ ให้ตรงกับ urls.py ของคุณ
+            fetch('/log_connect/?lineUserId=' + lineUserId)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     if (data.success && data.redirect_url) {
                         window.location.href = data.redirect_url;
@@ -95,4 +104,5 @@
         }
     </script>
 </body>
+
 </html>
